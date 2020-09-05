@@ -4,7 +4,7 @@
 #include <termios.h>
 using namespace std;
 
-vector<vector<char>> text;
+vector<vector<char> > text;
 
 unsigned int row = 0, col = 0;
 
@@ -23,7 +23,7 @@ void right(){
   if(col < text.at(row).size()){
 	col++;
 } else if(row < text.size() - 1){
-	row++
+	row++;
 	col = 0;
  }
 }
