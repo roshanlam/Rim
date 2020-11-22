@@ -43,6 +43,7 @@ Well, you can contribute and help me make it special or you can star, watch or f
 
 * Add Highlight
 * Add More Shortcuts 
+* Fix the insert and escape mode, they don't seem to work properly
 * Work On The Tab - It doesn't seem to work properly 
 * Start the program when user types Rim in the terminal
 
