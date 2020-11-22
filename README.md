@@ -24,9 +24,14 @@ The commands have been changed to make things more simple and easy to memorize.
 |Command|d        |Move down                                     |
 |Command|r        |Move right                                    |
 |Command|i        |Switch to insert mode                         |
+|Command|s        |Save                                          |
 |Command|q        |Quit the program                              |
 
+
 </center>
+
+<h1>Usage</h1>
+<p> ./rim filename </p>
 <center>
   <h2> ToDo </h2>
 
