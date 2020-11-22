@@ -31,8 +31,8 @@ The commands have been changed to make things more simple and easy to memorize.
 </center>
 
 <h1>Usage</h1>
-<p> 1. make </p>
-<p> ./rim filename </p>
+<p> 1) make </p>
+<p> 2) ./rim filename </p>
 <center>
   <h2> ToDo </h2>
 
