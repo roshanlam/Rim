@@ -10,6 +10,11 @@ Rim is a simplified version of vim.
 How is it simplified?
 
 The commands have been changed to make things more simple and easy to memorize.
+
+Okay but how is it special ?
+
+Well, you can contribute and help me make it special or you can star, watch or fork the project and wait for me to release features I am currently working on to make it special :)
+
 </p>
 </center>
 <center>
