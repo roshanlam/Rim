@@ -1,8 +1,9 @@
-output: rim.o
-	 g++ rim.o -o output
+CPP_FLAGS = -std=c++14 -Wall -Werror -Wpedantic -Weffc++
 
-rim.o: rim.cc
-	 g++ -c rim.cc
+FILES = screen.cc rim.cc main.cc
 
-clean:
-	 rm *.o output
+rim: ${FILES}
+	g++ -O3 ${CPP_FLAGS} ${FILES} -o rim -lncurses
+
+debug: ${FILES}
+	g++ -ggdb ${CPP_FLAGS} ${FILES} -o rim -lncurses

@@ -1,129 +1,273 @@
-#include <iostream>
-#include <vector>
-#include <cstdio>
-#include <termios.h>
-using namespace std;
+#include "rim.h"
 
-vector<vector<char> > text;
+Rim::Rim(const char* file_name) noexcept
+: file{fopen(file_name, "r+")}, screen{file_name} {
+	screen.display(std::begin(file_contents), 
+			std::end(file_contents),
+			cursor);
+}
 
-unsigned int row = 0, col = 0;
-
-bool command = false;
-
-void left(){
-  if(col > 0){
-	 col--;
-}else if(row > 0) {
-	row--;
-	col = text.at(row).size();
+std::vector<std::string> Rim::create_file_contents() noexcept {
+	std::vector<std::string> file_contents;
+	std::string file_line;
+	char c;
+	while ((c = fgetc(file)) != EOF) {
+		if (c != '\n') {
+			file_line += c;	
+		}
+		else {
+			file_contents.push_back(file_line);
+			file_line = "";
+		}
 	}
-      }
-
-void right(){
-  if(col < text.at(row).size()){
-	col++;
-} else if(row < text.size() - 1){
-	row++;
-	col = 0;
- }
+	return file_contents;
 }
 
-void up(){
-  if(row > 0){
-	row--;
-	if(col > text.at(row).size())
-		col = text.at(row).size();
- }
-}
-
-void down(){
-  if(row < text.size() - 1){
-	row++;
-  if(col > text.at(row).size())
-	col = text.at(row).size();
- }
-}
-
-void insert(char c){
-  if(c == '\n'){
-	vector<char> line;
-	for(unsigned int i = col; i < text.at(row).size(); i++)
-	line.push_back(text.at(row).at(i));
-	text.at(row).resize(col);
-
-	text.insert(text.begin() + row + 1, line);
-}else{
-	text.at(row).insert(text.at(row).begin() + col, c);
-}
-
-right();
-
-}
-
-void remove(){
-	if(row == 0 && col == 0) return;
-	left();
-
-if(col < text.at(row).size()) {
-	text.at(row).erase(text.at(row).begin() + col); 
-	} else {
-		for(unsigned int i = 0; i < text.at(row + 1).size(); i++)
-			text.at(row).push_back(text.at(row + 1).at(i));
-		text.erase(text.begin() + row + 1); 
+void Rim::process_keypress(int character) noexcept {
+	switch (current_mode) {
+		case Mode::NORMAL: 
+			normal_mode_action(character);
+			break;
+		case Mode::INSERT:
+			insert_mode_action(character);	
+			break;
+		case Mode::REPLACE:
+			replace_mode_action(character);
+			break;
 	}
+	screen.display(std::begin(file_contents) + top_of_screen_index,
+			std::end(file_contents),
+			cursor);
 }
 
-int getch() {
-	struct termios old;
-	tcgetattr(0, &old);
-	struct termios current = old;
-	current.c_lflag &= ~ICANON;
-	current.c_lflag &= ~ECHO; 
-	tcsetattr(0, TCSANOW, &current); 
-	int ch = getchar();
-	tcsetattr(0, TCSANOW, &old);
-	return ch;
-}
-
-
-void display() {
-	cout << "\x1B[2J";
-	cout << "\x1B[0;0f"; 
-	for(unsigned int i = 0; i < text.size(); i++) {
-		cout << "\x1B[K"; 
-		for(unsigned int j = 0; j < text.at(i).size(); j++)
-			cout << text.at(i).at(j);
-		cout << "\n";
-	}
-	
-	cout << "\x1B[K" << (command ? "command mode\n" : "insert mode\n");
-	cout << "\x1B[" << row + 1 << ';' << col + 1 << 'H';
-}
-
-void go(int ch) {
-	switch(ch) {
-		case 'i': command = false; break; 
-		case 'l': left(); break;
-		case 'u': up(); break;
-		case 'd': down(); break;
-		case 'r': right(); break;
-		
-		case 'q': exit(0); break;
+void Rim::normal_mode_action(int character) noexcept {
+	switch (character) {
+		case 'i':
+			current_mode = Mode::INSERT;
+			break;
+		case 'q':
+			endwin();
+			exit(1);
+			break;
+		case 'r':
+			move_cursor_right();
+			break;
+		case 'u':
+			move_cursor_up();
+			break;
+		case 'd':
+			move_cursor_down();
+			break;
+		case 'l':
+			move_cursor_left();
+			break;
+		case 'x':
+			file_contents[file_contents_index].replace(cursor.row_offset, 1, "");
+			break;
+		case 'R':
+			current_mode = Mode::REPLACE;
+			break;
+		case 's':
+			save();
+			break;
 	}
 }
-int main() {
-	text.push_back(vector<char>()); 
-	
-	for(;;) {
-		display();
-		int ch = getch();
-		if(command) 
-			go(ch);
-		else if(ch == '\e')
-			command = true;
-		else if(ch == 127) 
-			remove();
-		else
-			insert(ch);
+
+void Rim::move_cursor_right() noexcept {
+	const auto& current_line = file_contents[file_contents_index];
+	if (file_contents_index < file_contents.size()
+			&& cursor.row_offset < current_line.size()) {
+		if (current_line[cursor.row_offset] == '\t') {
+			cursor.x += SPACES_FOR_TAB;
+			++cursor.row_offset;
+		}
+		else {
+			++cursor.x;
+			++cursor.row_offset;
+		}
 	}
+}
+
+void Rim::move_cursor_up() noexcept {
+	if (file_contents_index != 0) {
+		const auto& line_above = file_contents[file_contents_index - 1];
+		const auto& current_line = file_contents[file_contents_index];
+
+		move_cursor_x_considering_lines(line_above, current_line);
+	}
+
+	if (cursor.y != 0) {
+		--cursor.y;
+		--file_contents_index;
+	}
+	else if (file_contents_index != 0) {
+		--file_contents_index; 
+		--top_of_screen_index;
+	}
+}
+
+void Rim::move_cursor_x_considering_lines(
+const std::string& line_considered, const std::string& current_line) noexcept {
+	if (line_considered.size() < current_line.size()) {
+		if (line_considered.size() == 0) {
+			cursor.x = 0;
+			cursor.row_offset = 0;
+		}
+		else if (cursor.x > line_considered.size()) {
+			cursor.x = line_considered.size() - 1;
+			cursor.row_offset = cursor.x;
+		}
+	}
+}
+
+void Rim::move_cursor_down() noexcept {
+	if (file_contents_index < file_contents.size()) {
+		if (file_contents_index + 1 < file_contents.size()) {
+			const auto& current_line = file_contents[file_contents_index];
+			const auto& line_below = file_contents[file_contents_index + 1];
+			move_cursor_x_considering_lines(line_below, current_line);
+
+		}
+		if (cursor.y + 1 != screen.rows) {
+			++cursor.y;	
+			++file_contents_index;
+		}
+		else {
+			++top_of_screen_index;
+			++file_contents_index;
+		}
+	}
+}
+
+void Rim::move_cursor_left() noexcept {
+	if (cursor.row_offset > 0) {
+		const auto& current_line = file_contents[file_contents_index];
+		if (current_line[cursor.row_offset - 1] == '\t') {
+			cursor.x -= SPACES_FOR_TAB;
+			--cursor.row_offset;
+		}
+		else {
+			--cursor.x;
+			--cursor.row_offset;
+		}
+	}
+}
+
+
+
+void Rim::insert_mode_action(int character) noexcept {
+	switch (character) {
+		case ESCAPE_KEY:
+			current_mode = Mode::NORMAL;
+			break;
+		case BACKSPACE_KEY:
+			delete_char();
+			break;
+		case ENTER_KEY:
+			add_new_line();
+			break;
+		default:
+			if (std::isprint(character) || character == '\t') {
+				insert_char(character);
+			}
+			break;
+	}
+}
+
+void Rim::replace_mode_action(int character) noexcept {
+	if (character == ESCAPE_KEY) {
+		current_mode = Mode::NORMAL;
+		return;
+	}
+	else if (std::isprint(character)) {
+		replace_char(character);
+	}
+}
+
+void Rim::delete_char() noexcept {
+	if (file_contents_index < file_contents.size()) {
+		auto& current_line = file_contents[file_contents_index];
+		if (cursor.row_offset == 0 
+				&& current_line.size() == 0) {
+			file_contents.erase(std::begin(file_contents) + file_contents_index);
+		}
+		else {
+			current_line.replace(cursor.row_offset, 1, "");
+		}
+		screen.is_file_modified = true;
+	}
+	move_cursor_left();
+}
+
+void Rim::add_new_line() noexcept {
+	if (file_contents_index < file_contents.size()) {
+		auto& current_line = file_contents[file_contents_index];
+
+		std::string rest_of_line{std::begin(current_line) + cursor.row_offset,
+			std::end(current_line)};
+
+		current_line.erase(cursor.row_offset, current_line.size());
+
+		file_contents.insert(
+				std::begin(file_contents) + file_contents_index + 1,
+				rest_of_line);
+
+		move_cursor_down();
+		cursor.x = 0;
+		cursor.row_offset = 0;
+	}
+	else {
+		file_contents.push_back("");
+	}
+
+	screen.is_file_modified = true;
+}
+
+void Rim::insert_char(int character) noexcept {
+	if (file_contents_index < file_contents.size()) {
+		auto& current_line = file_contents[file_contents_index];
+		if (cursor.row_offset < file_contents[file_contents_index].size()) {
+			current_line.insert(cursor.row_offset, 1, character);
+
+		}
+		else {
+			current_line.push_back(character);
+
+		}
+		move_cursor_right();
+	}
+	else {
+		file_contents.push_back("");
+	}
+	screen.is_file_modified = true;
+}
+
+void Rim::replace_char(int character) noexcept {	
+	if (file_contents_index < file_contents.size()) {
+		auto& current_line = file_contents[file_contents_index];
+		if (cursor.row_offset < file_contents[file_contents_index].size()) {
+			current_line[cursor.row_offset] = character;
+		}
+		else {
+			current_line.push_back(character);
+		}
+		move_cursor_right();
+	}
+	else {
+		file_contents.push_back("");
+	}
+	screen.is_file_modified = true;
+}
+
+void Rim::save() noexcept {
+	rewind(file);
+	for (const auto& str : file_contents) {
+		fputs(str.c_str(), file);	
+		fputs("\n", file);
+	}
+	screen.is_file_modified = false;
+}
+
+Rim::~Rim() {
+	fclose(file);
 }
