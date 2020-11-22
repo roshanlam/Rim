@@ -50,7 +50,7 @@ The process described here has several goals:
 * Limit the first line to 72 characters or less
 * Reference issues and pull requests liberally after the first line
 * When only changing documentation, include `[ci skip]` in the commit title
-* Consider starting the commit message with an emoji that makes sense to use in the context
+* Consider using emojis in the commit message that makes sense to use in terms of context
 
 ## Additional Notes
 
